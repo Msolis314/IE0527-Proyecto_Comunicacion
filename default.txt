@@ -1,0 +1,2 @@
+Archivo de prueba del sistema nRF24L01+
+Generado: 2025-12-02 15:36:06

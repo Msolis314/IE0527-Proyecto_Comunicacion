@@ -12,7 +12,7 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 SERVICE_NAME="nrf24-daemon"
-LOG_FILE="/home/pi/nrf24-transmision/nrf24_daemon.log"
+LOG_FILE="/home/mariana/Documents/IE0527-Proyecto_Comunicacion/nrf24_daemon.log"
 
 # Función para mostrar el banner
 show_banner() {

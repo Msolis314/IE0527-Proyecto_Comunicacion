@@ -14,10 +14,10 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuración
-INSTALL_DIR="/home/pi/nrf24-transmision"
+INSTALL_DIR="/home/mariana/Documents/IE0527-Proyecto_Comunicacion"
 SERVICE_FILE="nrf24-daemon.service"
-DAEMON_SCRIPT="nrf24_daemon.py"
-USER="pi"
+DAEMON_SCRIPT="NRF4_daemon.py"
+USER="mariana"
 
 echo -e "${BLUE}╔═══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${BLUE}║                                                           ║${NC}"
@@ -74,23 +74,52 @@ mkdir -p "$INSTALL_DIR/Textos"
 mkdir -p "$INSTALL_DIR/recibidos"
 echo -e "${GREEN}  ✓ Subdirectorios creados${NC}"
 
-echo -e "\n${GREEN}▶ Paso 3: Copiando archivos...${NC}"
+echo -e "\n${GREEN}▶ Paso 3: Verificando archivos...${NC}"
 
-# Copiar archivos Python
-PYTHON_FILES="compression.py constants.py fec.py frame_handler.py hardware.py radio_config.py receiver.py transmitter.py nrf24_daemon.py generar_archivos_prueba.py"
+# Verificar si estamos ejecutando desde el directorio de instalación
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-for file in $PYTHON_FILES; do
-    if [ -f "$file" ]; then
-        cp "$file" "$INSTALL_DIR/"
-        echo -e "${GREEN}  ✓ Copiado: $file${NC}"
+if [ "$SCRIPT_DIR" = "$INSTALL_DIR" ]; then
+    echo -e "${YELLOW}  ℹ Script ejecutándose desde el directorio de instalación${NC}"
+    echo -e "${YELLOW}  ℹ Omitiendo copia de archivos (ya están en su lugar)${NC}"
+    
+    # Verificar que existen los archivos necesarios
+    PYTHON_FILES="compression.py constants.py fec.py frame_handler.py hardware.py radio_config.py receiver.py transmitter.py NRF4_daemon.py generar_archivos_prueba.py"
+    missing_files=0
+    
+    for file in $PYTHON_FILES; do
+        if [ ! -f "$INSTALL_DIR/$file" ]; then
+            echo -e "${RED}  ✗ Archivo faltante: $file${NC}"
+            ((missing_files++))
+        fi
+    done
+    
+    if [ $missing_files -eq 0 ]; then
+        echo -e "${GREEN}  ✓ Todos los archivos Python están presentes${NC}"
     else
-        echo -e "${RED}  ✗ No encontrado: $file${NC}"
+        echo -e "${RED}  ✗ Faltan $missing_files archivos${NC}"
+        exit 1
     fi
-done
+else
+    # Copiar archivos Python desde la ubicación actual
+    echo -e "${YELLOW}  ℹ Copiando archivos desde: $SCRIPT_DIR${NC}"
+    PYTHON_FILES="compression.py constants.py fec.py frame_handler.py hardware.py radio_config.py receiver.py transmitter.py NRF4_daemon.py generar_archivos_prueba.py"
+
+    for file in $PYTHON_FILES; do
+        if [ -f "$SCRIPT_DIR/$file" ]; then
+            cp "$SCRIPT_DIR/$file" "$INSTALL_DIR/"
+            echo -e "${GREEN}  ✓ Copiado: $file${NC}"
+        else
+            echo -e "${RED}  ✗ No encontrado: $file${NC}"
+        fi
+    done
+fi
 
 # Hacer ejecutable el daemon
-chmod +x "$INSTALL_DIR/$DAEMON_SCRIPT"
-chmod +x "$INSTALL_DIR/generar_archivos_prueba.py"
+chmod +x "$INSTALL_DIR/NRF4_daemon.py"
+if [ -f "$INSTALL_DIR/generar_archivos_prueba.py" ]; then
+    chmod +x "$INSTALL_DIR/generar_archivos_prueba.py"
+fi
 
 echo -e "\n${GREEN}▶ Paso 4: Configurando permisos...${NC}"
 
@@ -102,24 +131,52 @@ echo -e "${GREEN}  ✓ Propietario configurado: $USER${NC}"
 usermod -a -G spi,gpio $USER
 echo -e "${GREEN}  ✓ Usuario agregado a grupos: spi, gpio${NC}"
 
-echo -e "\n${GREEN}▶ Paso 5: Instalando dependencias Python...${NC}"
+echo -e "\n${GREEN}▶ Paso 5: Creando entorno virtual e instalando dependencias...${NC}"
 
-# Instalar dependencias como usuario pi
-su - $USER -c "pip3 install --user pyrf24 reedsolo RPi.GPIO" 2>&1 | grep -E "(Successfully|already satisfied)" || true
-echo -e "${GREEN}  ✓ Dependencias instaladas${NC}"
+# Verificar que python3-venv está instalado
+if ! python3 -m venv --help &> /dev/null; then
+    echo -e "${YELLOW}  ℹ python3-venv no encontrado, instalando...${NC}"
+    apt-get update -qq
+    apt-get install -y python3-venv > /dev/null 2>&1
+    echo -e "${GREEN}  ✓ python3-venv instalado${NC}"
+fi
+
+# Crear entorno virtual como usuario
+echo -e "${YELLOW}  ℹ Creando entorno virtual en $INSTALL_DIR/.venv${NC}"
+if [ ! -d "$INSTALL_DIR/.venv" ]; then
+    su - $USER -c "cd $INSTALL_DIR && python3 -m venv .venv"
+    echo -e "${GREEN}  ✓ Entorno virtual creado${NC}"
+else
+    echo -e "${YELLOW}  ℹ Entorno virtual ya existe${NC}"
+fi
+
+# Instalar dependencias en el entorno virtual
+echo -e "${YELLOW}  ℹ Instalando dependencias en el entorno virtual...${NC}"
+su - $USER -c "cd $INSTALL_DIR && source .venv/bin/activate && pip install --upgrade pip > /dev/null 2>&1"
+su - $USER -c "cd $INSTALL_DIR && source .venv/bin/activate && pip install pyrf24 reedsolo RPi.GPIO" 2>&1 | grep -E "(Successfully|already satisfied)" || true
+
+echo -e "${GREEN}  ✓ Dependencias instaladas en entorno virtual${NC}"
+
+# Verificar instalación
+echo -e "${YELLOW}  ℹ Verificando instalación...${NC}"
+su - $USER -c "cd $INSTALL_DIR && source .venv/bin/activate && python -c 'from pyrf24 import RF24; import reedsolo; import RPi.GPIO; print(\"✓ Módulos verificados\")'" || {
+    echo -e "${RED}  ✗ Error al verificar módulos${NC}"
+    exit 1
+}
 
 echo -e "\n${GREEN}▶ Paso 6: Configurando servicio systemd...${NC}"
 
 # Copiar archivo de servicio
 if [ -f "$SERVICE_FILE" ]; then
-    # Actualizar rutas en el archivo de servicio
+    # Actualizar rutas en el archivo de servicio para usar el entorno virtual
     sed -i "s|WorkingDirectory=.*|WorkingDirectory=$INSTALL_DIR|g" "$SERVICE_FILE"
-    sed -i "s|ExecStart=.*|ExecStart=/usr/bin/python3 $INSTALL_DIR/$DAEMON_SCRIPT|g" "$SERVICE_FILE"
+    sed -i "s|ExecStart=.*|ExecStart=$INSTALL_DIR/.venv/bin/python $INSTALL_DIR/$DAEMON_SCRIPT|g" "$SERVICE_FILE"
     sed -i "s|User=.*|User=$USER|g" "$SERVICE_FILE"
     sed -i "s|Group=.*|Group=$USER|g" "$SERVICE_FILE"
     
     cp "$SERVICE_FILE" /etc/systemd/system/
     echo -e "${GREEN}  ✓ Archivo de servicio copiado${NC}"
+    echo -e "${GREEN}  ✓ Configurado para usar: $INSTALL_DIR/.venv/bin/python${NC}"
 else
     echo -e "${RED}  ✗ Archivo de servicio no encontrado: $SERVICE_FILE${NC}"
     exit 1
@@ -135,8 +192,8 @@ echo -e "${GREEN}  ✓ Servicio habilitado para inicio automático${NC}"
 
 echo -e "\n${GREEN}▶ Paso 7: Creando archivos de prueba...${NC}"
 
-# Crear archivos de prueba como usuario pi
-su - $USER -c "cd $INSTALL_DIR && python3 generar_archivos_prueba.py --num 3" > /dev/null 2>&1
+# Crear archivos de prueba como usuario usando el entorno virtual
+su - $USER -c "cd $INSTALL_DIR && source .venv/bin/activate && python generar_archivos_prueba.py --num 3" > /dev/null 2>&1
 echo -e "${GREEN}  ✓ Archivos de prueba creados en $INSTALL_DIR/Textos/${NC}"
 
 echo -e "\n${BLUE}╔═══════════════════════════════════════════════════════════╗${NC}"

@@ -1,0 +1,10 @@
+Documento de prueba #2
+    
+Este archivo contiene datos de sensores simulados:
+
+Temperatura: 2025-12-02 15:35:57 °C
+Humedad: 33%
+Presión: 40 hPa
+Timestamp: 1002
+
+Sistema de monitoreo v1.0

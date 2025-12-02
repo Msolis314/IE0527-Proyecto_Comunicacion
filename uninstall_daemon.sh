@@ -11,7 +11,7 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m'
 
-INSTALL_DIR="/home/pi/nrf24-transmision"
+INSTALL_DIR="/home/mariana/Documents/IE0527-Proyecto_Comunicacion"
 SERVICE_NAME="nrf24-daemon"
 
 echo -e "${RED}╔═══════════════════════════════════════════════════════════╗${NC}"

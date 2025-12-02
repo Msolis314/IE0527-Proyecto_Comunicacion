@@ -1,0 +1,31 @@
+[Unit]
+Description=nRF24L01+ Transmission System Daemon
+After=network.target
+Documentation=https://github.com/tu-repo/nrf24-system
+
+[Service]
+Type=simple
+User=mariana
+Group=mariana
+WorkingDirectory=/home/mariana/Documents/IE0527-Proyecto_Comunicacion
+Environment="PYTHONUNBUFFERED=1"
+ExecStart=/home/mariana/Documents/IE0527-Proyecto_Comunicacion/.venv/bin/python /home/mariana/Documents/IE0527-Proyecto_Comunicacion/NRF4_daemon.py
+Restart=on-failure
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Límites de recursos
+MemoryLimit=256M
+CPUQuota=50%
+
+# Permisos
+SupplementaryGroups=spi gpio
+
+# Seguridad
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+
